@@ -4,10 +4,12 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.adbify.BuildConfig.DEBUG
+import com.adbify.usb.UsbHostManager
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -19,6 +21,7 @@ import java.util.Date
 class AdbifyApp : Application(), Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
     private lateinit var appOpenAdManager: AppOpenAdManager
     private var currentActivity: Activity? = null
+    private var usbHostManager: UsbHostManager? = null
 
     override fun onCreate() {
         super<Application>.onCreate()
@@ -27,6 +30,16 @@ class AdbifyApp : Application(), Application.ActivityLifecycleCallbacks, Default
         MobileAds.initialize(this) {}
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
         appOpenAdManager = AppOpenAdManager()
+
+        // Initialize USB host manager early so device detection works
+        // before any activity requests permission
+        try {
+            usbHostManager = UsbHostManager.getInstance(this)
+            usbHostManager?.scanAndRequestPermissions()
+            Log.i(TAG, "USB host manager initialized")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to initialize USB host manager: ${e.message}")
+        }
     }
 
     override fun onStart(owner: LifecycleOwner) {
@@ -55,6 +68,13 @@ class AdbifyApp : Application(), Application.ActivityLifecycleCallbacks, Default
     fun showAdIfAvailable(activity: Activity, onShowAdCompleteListener: OnShowAdCompleteListener) {
         appOpenAdManager.showAdIfAvailable(activity, onShowAdCompleteListener)
     }
+
+    override fun onTerminate() {
+        super.onTerminate()
+        usbHostManager?.shutdown()
+    }
+
+    fun getUsbHostManager(): UsbHostManager? = usbHostManager
 
     interface OnShowAdCompleteListener {
         fun onShowAdComplete()
@@ -155,6 +175,7 @@ class AdbifyApp : Application(), Application.ActivityLifecycleCallbacks, Default
     }
 
     companion object {
+        private const val TAG = "AdbifyApp"
         lateinit var instance: Application
             private set
 

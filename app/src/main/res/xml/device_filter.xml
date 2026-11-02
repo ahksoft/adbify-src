@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ADB and debugging capable devices -->
+    <usb-device vendor-id="3034" product-id="7424" /> <!-- Google 0x18D1:0x1CF0 Pixel/Titan -->
+    <usb-device vendor-id="3034" /> <!-- Google -->
+
+    <!-- Common USB-serial/ADB devices -->
+    <usb-device vendor-id="1027" /> <!-- FTDI -->
+    <usb-device vendor-id="4292" /> <!-- Silabs CP210x -->
+    <usb-device vendor-id="1659" /> <!-- Prolific PL2303 -->
+    <usb-device vendor-id="6790" /> <!-- QinHeng CH340/CH341 -->
+    <usb-device vendor-id="6353" /> <!-- Various -->
+    <usb-device vendor-id="19469" /> <!-- Xiaomi -->
+
+    <!-- Qualcomm / Android devices in EDL/9008 mode -->
+    <usb-device vendor-id="1736" /> <!-- 0x06C8 -->
+    <usb-device vendor-id="2208" /> <!-- 0x08A0 -->
+    <usb-device vendor-id="2209" /> <!-- 0x08A1 -->
+
+    <!-- MediaTek preloader / download mode -->
+    <usb-device vendor-id="3725" product-id="61538" /> <!-- 0x0E8D:0xF03C -->
+    <usb-device vendor-id="3725" product-id="24593" /> <!-- 0x0E8D:0x6011 -->
+    <usb-device vendor-id="3725" product-id="61537" /> <!-- 0x0E8D:0xF03B -->
+    <usb-device vendor-id="3725" /> <!-- MediaTek fallback -->
+
+    <!-- Samsung / Other major OEMs -->
+    <usb-device vendor-id="6176" /> <!-- Samsung 0x1810 -->
+    <usb-device vendor-id="5118" /> <!-- 0x1402 -->
+    <usb-device vendor-id="9208" /> <!-- 0x23F0 -->
+</resources>

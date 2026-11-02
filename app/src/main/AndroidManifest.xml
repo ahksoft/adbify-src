@@ -6,6 +6,14 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <!-- The packaged adb is a USB-capable build (it links libusb.so + libusb_bridge.so),
+         so declare USB host support. required=false keeps Adbify installable on devices
+         without a USB host port; the network-only adb in the other ABI splits still works
+         there. See NativePayload for how the tools are staged onto PATH. -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-permission
@@ -13,6 +21,7 @@
         android:maxSdkVersion="32" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.USB_PERMISSION" />
 
     <application
         android:name="com.adbify.AdbifyApp"
@@ -41,6 +50,12 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
         </activity>
 
         <service

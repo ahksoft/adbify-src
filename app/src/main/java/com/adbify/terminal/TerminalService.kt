@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.system.Os
 import android.util.Log
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
@@ -17,7 +16,6 @@ import com.adbify.MainActivity
 import com.adbify.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
-import java.io.File
 
 class TerminalService : Service() {
     private val binder: IBinder = LocalBinder()
@@ -149,41 +147,22 @@ class TerminalService : Service() {
     @Synchronized
     fun getOrCreateTerminalSession(): TerminalSession {
         if (terminalSession == null) {
-            val envs = arrayOfNulls<String>(5)
-            envs[0] = "TERM=screen"
-            envs[1] = "HOME=$adbHomeDir"
-            envs[2] = "TMPDIR=${cacheDir.absolutePath}"
-            envs[3] = "ADB=$ADB"
-            envs[4] = "PATH=${Os.getenv("PATH")}:${ADB.substring(0, ADB.lastIndexOf("/"))}"
+            // Stages bin/ and lib/ symlinks and unpacks the bootstrap tree before the shell
+            // starts; idempotent, and degrades to a plain network-only adb when absent.
+            NativePayload.provision(this)
             terminalSession = TerminalSession(
-                "/system/bin/sh",
-                "/", arrayOf<String>(),
-                envs,
+                NativePayload.shellPath,
+                // Start in $HOME rather than "/", so the prompt lands in the user's own
+                // directory the way a Termux session does.
+                NativePayload.homeDir.absolutePath,
+                arrayOf<String>(),
+                NativePayload.buildEnv(),
                 TerminalEmulator.DEFAULT_TERMINAL_TRANSCRIPT_ROWS,
                 terminalSessionActivityClient
             )
         }
         return terminalSession as TerminalSession
     }
-
-    private val adbHomeDir: String
-        get() {
-            val homeDir = File(filesDir, "home")
-            if (!homeDir.exists()) homeDir.mkdirs()
-            return homeDir.absolutePath
-        }
-
-    private val ADB: String
-        get() {
-            val binDir = File(filesDir, "bin")
-            binDir.deleteRecursively()
-            if (!binDir.exists()) binDir.mkdirs()
-            Os.symlink(
-                "${applicationInfo.nativeLibraryDir}/libadb.so",
-                "${binDir.absolutePath}/adb"
-            )
-            return binDir.resolve("adb").absolutePath
-        }
 
     inner class LocalBinder : Binder() {
         val service = this@TerminalService

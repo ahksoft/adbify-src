@@ -1,9 +1,12 @@
 package com.adbify
 
 import android.Manifest
+import android.app.PendingIntent
 import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Typeface
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +15,7 @@ import android.text.method.LinkMovementMethod
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -26,6 +30,8 @@ import com.adbify.terminal.TerminalSettingsHelper.setKeepScreenOn
 import com.adbify.terminal.TerminalSettingsHelper.shouldKeepScreenOn
 import com.adbify.terminal.TerminalViewClient
 import com.adbify.terminal.view.TerminalView
+import com.adbify.usb.UsbDeviceInfo
+import com.adbify.usb.UsbHostManager
 import com.adbify.utils.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +54,51 @@ class MainActivity : AppBarActivity(), ServiceConnection {
     private var isActivityRecreated = false
     private var isInvalidState = false
 
+    private lateinit var usbManager: UsbManager
+    private var usbHostManager: UsbHostManager? = null
+
+    private val usbListener = object : UsbHostManager.UsbHostListener {
+        override fun onDeviceAttached(device: UsbDeviceInfo) {
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    "USB device attached: ${device.vidPidHex()} ${device.productName ?: ""}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        override fun onDeviceDetached(deviceName: String) {
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    "USB device detached: $deviceName",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        override fun onPermissionGranted(device: UsbDeviceInfo) {
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    "USB permission granted for ${device.vidPidHex()}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        override fun onPermissionDenied(deviceName: String) {
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    "USB permission denied for $deviceName",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
     private var choiceFile =
         registerForActivityResult(GetContentContract()) { uri: Uri? ->
             handleFileUri(this, uri)
@@ -62,6 +113,11 @@ class MainActivity : AppBarActivity(), ServiceConnection {
         setContentView(binding.root)
 
         setTerminalViewAndClients()
+
+        usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        usbHostManager = UsbHostManager.getInstance(this)
+        usbHostManager?.registerListener(usbListener)
+        usbHostManager?.scanAndRequestPermissions()
 
         try {
             val serviceIntent = Intent(this, TerminalService::class.java)
@@ -173,6 +229,7 @@ class MainActivity : AppBarActivity(), ServiceConnection {
     }
 
     override fun onDestroy() {
+        usbHostManager?.unregisterListener(usbListener)
         if (isInvalidState) return
         if (terminalService != null) {
             terminalService!!.unsetTerminalSessionClient()

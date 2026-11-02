@@ -2,24 +2,34 @@ plugins {
     id 'com.android.library'
 }
 
+// ndk-build's host tools do not run on an aarch64 Linux box: NDK 25 rejects the host
+// outright ("Unknown host CPU architecture: aarch64") and NDK 26 ships Android binaries as
+// its host tools (interpreter /system/bin/linker64). Pass -PskipNdkBuild to drop the
+// ndk-build steps and package the staged libadbify-term.so from src/main/jniLibs instead:
+//
+//   ./scripts/build-native-libs.sh && ./gradlew assembleDebug -PskipNdkBuild
+def skipNdkBuild = project.hasProperty('skipNdkBuild')
+
 android {
     namespace "com.adbify.terminal"
     compileSdk rootProject.ext.compileSdk
     buildToolsVersion rootProject.ext.buildToolsVersion
-    ndkVersion '25.2.9519653'
+    ndkVersion '26.1.0'
 
     defaultConfig {
         minSdk rootProject.ext.minSdk
         targetSdk rootProject.ext.targetSdk
 
-        externalNativeBuild {
-            ndkBuild {
-                cFlags '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os', '-fno-stack-protector', '-Wl,--gc-sections'
+        if (!skipNdkBuild) {
+            externalNativeBuild {
+                ndkBuild {
+                    cFlags '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os', '-fno-stack-protector', '-Wl,--gc-sections'
+                }
             }
         }
 
         ndk {
-            abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+            abiFilters 'arm64-v8a'
         }
     }
 
@@ -35,9 +45,11 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path file('src/main/jni/Android.mk')
+    if (!skipNdkBuild) {
+        externalNativeBuild {
+            ndkBuild {
+                path file('src/main/jni/Android.mk')
+            }
         }
     }
 }
@@ -46,4 +58,14 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.6.0'
 
     implementation 'com.getkeepsafe.relinker:relinker:1.4.5'
+}
+
+// AGP strips JNI libs with the NDK's llvm-strip, which is unusable for the same reason as
+// ndk-build on this host -- and unlike :app, a library module treats the failure as fatal.
+// The script links at -Os, so shipping the libs unstripped is fine. debugSymbolLevel does
+// not help here: it does not disable this task in AGP 8.0.
+if (skipNdkBuild) {
+    tasks.matching { it.name ==~ /strip.*DebugSymbols/ }.configureEach {
+        enabled = false
+    }
 }

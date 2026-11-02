@@ -120,6 +120,13 @@ JNIEXPORT jint JNICALL Java_com_adbify_terminal_JNI_createSubprocess(
         jintArray processIdArray,
         jint rows,
         jint columns) {
+    if (cmd == NULL) {
+        return throw_runtime_exception(env, "createSubprocess: cmd (shell path) is null");
+    }
+    if (cwd == NULL) {
+        return throw_runtime_exception(env, "createSubprocess: cwd is null");
+    }
+
     jsize size = args ? (*env)->GetArrayLength(env, args) : 0;
     char **argv = NULL;
     if (size > 0) {
@@ -127,9 +134,17 @@ JNIEXPORT jint JNICALL Java_com_adbify_terminal_JNI_createSubprocess(
         if (!argv) return throw_runtime_exception(env, "Couldn't allocate argv array");
         for (int i = 0; i < size; ++i) {
             jstring arg_java_string = (jstring) (*env)->GetObjectArrayElement(env, args, i);
+            if (arg_java_string == NULL) {
+                argv[i] = NULL;
+                continue;
+            }
             char const *arg_utf8 = (*env)->GetStringUTFChars(env, arg_java_string, NULL);
-            if (!arg_utf8)
+            if (!arg_utf8) {
+                // Release any previously allocated argv entries before returning.
+                for (int j = 0; j < i; ++j) free(argv[j]);
+                free(argv);
                 return throw_runtime_exception(env, "GetStringUTFChars() failed for argv");
+            }
             argv[i] = strdup(arg_utf8);
             (*env)->ReleaseStringUTFChars(env, arg_java_string, arg_utf8);
         }
@@ -140,12 +155,29 @@ JNIEXPORT jint JNICALL Java_com_adbify_terminal_JNI_createSubprocess(
     char **envp = NULL;
     if (size > 0) {
         envp = (char **) malloc((size + 1) * sizeof(char *));
-        if (!envp) return throw_runtime_exception(env, "malloc() for envp array failed");
+        if (!envp) {
+            if (argv) {
+                for (int i = 0; argv[i]; ++i) free(argv[i]);
+                free(argv);
+            }
+            return throw_runtime_exception(env, "malloc() for envp array failed");
+        }
         for (int i = 0; i < size; ++i) {
             jstring env_java_string = (jstring) (*env)->GetObjectArrayElement(env, envVars, i);
+            if (env_java_string == NULL) {
+                envp[i] = NULL;
+                continue;
+            }
             char const *env_utf8 = (*env)->GetStringUTFChars(env, env_java_string, 0);
-            if (!env_utf8)
+            if (!env_utf8) {
+                for (int j = 0; j < i; ++j) free(envp[j]);
+                free(envp);
+                if (argv) {
+                    for (int j = 0; argv[j]; ++j) free(argv[j]);
+                    free(argv);
+                }
                 return throw_runtime_exception(env, "GetStringUTFChars() failed for env");
+            }
             envp[i] = strdup(env_utf8);
             (*env)->ReleaseStringUTFChars(env, env_java_string, env_utf8);
         }
@@ -157,7 +189,7 @@ JNIEXPORT jint JNICALL Java_com_adbify_terminal_JNI_createSubprocess(
     char const *cmd_utf8 = (*env)->GetStringUTFChars(env, cmd, NULL);
     int ptm = create_subprocess(env, cmd_utf8, cmd_cwd, argv, envp, &procId, rows, columns);
     (*env)->ReleaseStringUTFChars(env, cmd, cmd_utf8);
-    (*env)->ReleaseStringUTFChars(env, cmd, cmd_cwd);
+    (*env)->ReleaseStringUTFChars(env, cwd, cmd_cwd);
 
     if (argv) {
         for (char **tmp = argv; *tmp; ++tmp) free(*tmp);

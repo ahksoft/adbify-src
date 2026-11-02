@@ -10,7 +10,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
-        applicationId "com.rv882.adbify"
+        applicationId "ahk.unitool"
         minSdk rootProject.ext.minSdk
         targetSdk rootProject.ext.targetSdk
         versionCode rootProject.ext.versionCode
@@ -42,6 +42,36 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging true
+        }
+    }
+
+    // AGP strips JNI libs with the NDK's llvm-strip, which is unusable on this aarch64 host
+    // (same reason ndk-build fails). When -PskipNdkBuild is passed, replace the strip task
+    // action with a passthrough copy so the native libraries still reach the packaging step.
+    if (project.hasProperty('skipNdkBuild')) {
+        tasks.matching { it.name ==~ /strip.*DebugSymbols/ }.configureEach {
+            it.actions.clear()
+            it.enabled = true
+            it.doFirst {
+                def mergedDir = file("build/intermediates/merged_native_libs/debug/out")
+                def outputDir = file("build/intermediates/stripped_native_libs/debug/out")
+                project.delete(outputDir)
+                outputDir.mkdirs()
+                if (mergedDir.exists()) {
+                    fileTree(mergedDir).visit { fileVisitDetails ->
+                        if (!fileVisitDetails.directory && fileVisitDetails.name.endsWith('.so')) {
+                            def relPath = fileVisitDetails.relativePath.toString()
+                            def destFile = new File(outputDir, relPath)
+                            destFile.parentFile.mkdirs()
+                            project.copy {
+                                from fileVisitDetails.file
+                                into destFile.parentFile
+                                rename { destFile.name }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

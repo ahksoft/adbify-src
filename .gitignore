@@ -59,6 +59,27 @@ captures/
 .externalNativeBuild
 .cxx/
 
+# libadbify-term.so staged by scripts/build-native-libs.sh -- generated, not a source
+# prebuild. Do NOT ignore jniLibs broadly: app/src/main/jniLibs holds the committed
+# libadb.so prebuilds that the app cannot build without.
+terminalview/src/main/jniLibs/
+
+# libpython-payload.so is the CPython 3.14 + mtkclient payload, staged by
+# /root/UniTool-dev/mba/package.sh. Excluded because it is 60 MB -- an order of magnitude
+# larger than anything else committed here -- and unlike libadb.so it needs a full
+# cross-compilation toolchain (host clang, a synthetic resource dir, rustup's ld.lld) to
+# rebuild, so it cannot be reconstructed from this repo alone anyway.
+#
+# Consequence: a fresh clone builds without `mtk` until someone runs
+# /root/UniTool-dev/mba/build-all.sh. The app is otherwise unaffected -- NativePayload skips
+# the payload when nativeLibraryDir has no such file, so it degrades to plain adb.
+app/src/main/jniLibs/arm64-v8a/libpython-payload.so
+
+# Baseline profile output. AGP generates this into src/main/assets/dexopt/ on every build,
+# so it is build output that has landed in a source directory -- untracked and unignorable is
+# what makes it look like a new file to commit. 2 KB, and always regenerated.
+/app/src/main/assets/dexopt/
+
 # Google Services (e.g. APIs or Firebase)
 # google-services.json
 
